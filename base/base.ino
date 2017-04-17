@@ -40,6 +40,10 @@ void loop() {
           Serial.print(",");
           Serial.println(inRadioMessage.payloadB); 
         break;
+        case ERROR_DATA_MESSAGE:
+          Serial.print("p,");
+          Serial.println(inRadioMessage.payloadA);
+        break;
       }
    }
   
@@ -61,50 +65,30 @@ Message getMessageFromSerial(char * serialInMsg) {
     switch(msgType[0]) {
       case 'F': {
         msg.type = MOVE_FORWARD_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-        msg.payloadB = atoi(strtok(NULL, ","));
+        //msg.payloadA = atoi(strtok(NULL, ","));
+        //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break;
       case 'B': {
         msg.type = MOVE_BACKWARD_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-        msg.payloadB = atoi(strtok(NULL, ","));
+        //msg.payloadA = atoi(strtok(NULL, ","));
+        //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break; 
       case 'L': {
         msg.type = TURN_LEFT_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-        msg.payloadB = atoi(strtok(NULL, ","));
+        //msg.payloadA = atoi(strtok(NULL, ","));
+        //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break; 
       case 'R': {
         msg.type = TURN_RIGHT_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-        msg.payloadB = atoi(strtok(NULL, ","));
+        //msg.payloadA = atoi(strtok(NULL, ","));
+        //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break;
       case 'S': {
         msg.type = STOP_MESSAGE;
-      }
-      break;
-      case 'f': {
-        msg.type = MOVE_FORWARD_BY_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-      }
-      break;
-      case 'b': {
-        msg.type = MOVE_BACKWARD_BY_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-      }
-      break;
-      case 'l': {
-        msg.type = TURN_LEFT_BY_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
-      }
-      break;
-      case 'r': {
-        msg.type = TURN_RIGHT_BY_MESSAGE;
-        msg.payloadA = atoi(strtok(NULL, ","));
       }
       break;
     }
