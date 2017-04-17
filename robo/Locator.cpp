@@ -9,7 +9,7 @@ int Locator::echo() {
   digitalWrite(trigPin, LOW);
   impulseTime = pulseIn(echoPin, HIGH, TIMEOUT);
   interrupts();
-  if (impulseTime == 0) distance = -1;
+  if (impulseTime == 0) distance = 110;
   else distance = impulseTime / 58;
   return distance;
 }

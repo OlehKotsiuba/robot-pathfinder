@@ -8,7 +8,7 @@ Locator locator;
 IntList pressedKeys = new IntList();
 
 void setup() {
-  size(1000,600);
+  size(450,300);
   port = new Serial(this, "COM7", 115200); 
   port.bufferUntil('\n'); 
   createGUI();
@@ -21,19 +21,23 @@ void serialEvent(Serial p) {
   String[] m = message.split(",");
   switch(m[0]) {
     case "E":
-      int sum = 0;
+      float sum = 0;
       try{
-       sum = Integer.parseInt(m[1].trim()) + Integer.parseInt(m[2].trim());
+       sum = Float.parseFloat(m[1].trim()) / Float.parseFloat(m[2].trim());
       } catch(Exception error) {
         println(error);
       }
-      println("L:"+m[1]+" R:"+m[2]+" SUM:"+sum);
+      println("tics:"+m[1]+" distance:"+m[2]+" RES:"+sum);
     break;
     case "l":
-       int position = Integer.parseInt(m[1].trim());
-       int distance = Integer.parseInt(m[2].trim());
-       locator.addData(position, distance);
-       break;
+     int position = Integer.parseInt(m[1].trim());
+     int distance = Integer.parseInt(m[2].trim());
+     locator.addData(position, distance);
+   break;
+    case "p":
+      int error = Integer.parseInt(m[1].trim());
+      println("Error: ", error);
+      break;
     default:
       println("Unknown message: "+message);
     break;
@@ -42,7 +46,6 @@ void serialEvent(Serial p) {
 
 void draw(){
   background(color(0xFFFFFF));
-  locator.draw();
 }
  
 void keyPressed() {
@@ -64,45 +67,23 @@ void keyReleased()
 } 
 
 void sendMoveMessage(int pressedKeyCode) {
-  int lThrottle = lThrottleSlider.getValueI(), rThrottle = rThrottleSlider.getValueI();
-  
   switch(pressedKeyCode) {
     case 87: // W key
-      port.write("F,"+lThrottle+","+rThrottle+"\n");
+      port.write("F\n");
     break;
     case 65: // A key
-      port.write("L,"+lThrottle+","+rThrottle+"\n");
+      port.write("L\n");
     break;
     case 83: // S key 
-      port.write("B,"+lThrottle+","+rThrottle+"\n");
+      port.write("B\n");
     break;
     case 68: // D key
-      port.write("R,"+lThrottle+","+rThrottle+"\n");
+      port.write("R\n");
     break;
   }
-}
-
-void sendTurnLeftByMessage(int path) {
-  port.write("l,"+path+"\n");
-}
-
-void sendTurnRightByMessage(int path) {
-  port.write("r,"+path+"\n");
-}
-
-void sendMoveForwardByMessage(int path) {
-  port.write("f,"+path+"\n");
-}
-
-void sendMoveBakwardByMessage(int path) {
-  port.write("b,"+path+"\n");
 }
 
 
 void sendStopMessage() {
   port.write("S\n");
-}
-
-void throttle_slider_change() {
-  println("THROTTLE");
 }

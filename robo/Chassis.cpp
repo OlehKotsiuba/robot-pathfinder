@@ -17,16 +17,9 @@ void Chassis::reset() {
   startMoveTime = millis();
 }
 
-Chassis::Chassis(Motor *lMotor, Motor *rMotor): leftMotor(lMotor), rightMotor(rMotor) {}
-
-void Chassis::onLeftEncoderTick() {
-  if (state == STOP) return;
-  leftEncoderCount++;
-}
-
-void Chassis::onRightEncoderTick() {
-  if (state == STOP) return;
-  rightEncoderCount++;
+Chassis::Chassis(byte lThrottlePin, byte lForwardPin, byte lReversePin, byte rThrottlePin, byte rForwardPin, byte  rReversePin, byte maxThrottle){
+  leftMotor = new Motor(lThrottlePin, lForwardPin, lReversePin, 200);
+  rightMotor = new Motor(rThrottlePin, rForwardPin, rReversePin, 200);
 }
 
 void Chassis::checkBalance() {
@@ -107,7 +100,7 @@ void Chassis::turnRight(int angle) {
 
 void Chassis::stop() {
   if (state != STOP) {
-  brake();
+  //brake();
   stateChanged();
   state = STOP;
   leftMotor->stop();
@@ -133,20 +126,9 @@ void Chassis::brake() {
   delay(constrain(moveTime / 10, 0, 200));
 }
 
-long Chassis::getLeftEncoderCount() {
-  return leftEncoderCount;
-}
-
- long Chassis::getRightEncoderCount() {
-  return rightEncoderCount;
-}
 
 void Chassis::setEncoderDataListener(void (*listener)(int, int)) {
   encoderListener = listener;
-}
-
-void Chassis::setFinishMoveListener(void (*listener)()) {
-  finishMoveListener = listener;
 }
 
 bool Chassis::isStopped() {
@@ -162,5 +144,21 @@ bool Chassis::tick() {
   checkPath();
   return (state == STOP);
 }
+
+void Chassis::attachInterrupts(byte leftPin, byte rightPin) {
+  attachInterrupt(digitalPinToInterrupt(2), onLeftInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(3), onRightInterrupt, CHANGE);
+}
+
+void Chassis::onLeftInterrupt() {
+  leftEncoderCount++;
+}
+
+void Chassis::onRightInterrupt() {
+  rightEncoderCount++;
+}
+
+volatile long Chassis::leftEncoderCount = 0;
+volatile long Chassis::rightEncoderCount = 0;
 
 

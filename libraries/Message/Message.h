@@ -1,7 +1,7 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-enum Type {
+enum MessageType {
 	MOVE_FORWARD_MESSAGE,
 	MOVE_BACKWARD_MESSAGE,
 	TURN_LEFT_MESSAGE,

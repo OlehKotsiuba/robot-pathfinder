@@ -15,7 +15,8 @@ void setup() {
   radio.begin();
 
   radio.setPALevel(RF24_PA_LOW);
-  
+  radio.setPayloadSize(5);
+
   radio.openWritingPipe(addresses[0]);
   radio.openReadingPipe(1,addresses[1]);
 
@@ -40,10 +41,6 @@ void loop() {
           Serial.print(",");
           Serial.println(inRadioMessage.payloadB); 
         break;
-        case ERROR_DATA_MESSAGE:
-          Serial.print("p,");
-          Serial.println(inRadioMessage.payloadA);
-        break;
       }
    }
   
@@ -53,6 +50,7 @@ void loop() {
     serialInMsg[length] = '\0';
     Message outRadioMessage = getMessageFromSerial(serialInMsg);
     radio.stopListening();
+    byte retry = 0;
     radio.write( &outRadioMessage, sizeof(Message));
   }
 
@@ -94,39 +92,4 @@ Message getMessageFromSerial(char * serialInMsg) {
     }
     return msg;
 }
-
-Message createMessageFromController(int x, int y) {
-  Message msg;
-  int backlash = 15;
-  if (abs(512 - y) > abs(512 - x))
-  {
-    if (y < 512 - backlash) {
-      msg.type = TURN_LEFT_MESSAGE;
-      int throttle = map(y, 512 - backlash, 0, 0, 255);
-      msg.payloadA = throttle;
-      msg.payloadB = throttle;
-    } 
-    else if (y > 512 + backlash) {
-      msg.type = TURN_RIGHT_MESSAGE;
-      int throttle = map(y, 512 + backlash, 1023, 0, 255);
-      msg.payloadA = throttle;
-      msg.payloadB = throttle;
-    } 
-  } else {
-      if (x < 512 - backlash) {
-      msg.type = MOVE_BACKWARD_MESSAGE;
-      int throttle = map(x, 512 - backlash, 0, 0, 255);
-      msg.payloadA = throttle;
-      msg.payloadB = throttle;
-    }
-    else if (x > 512 + backlash) {
-      msg.type = MOVE_FORWARD_MESSAGE;
-      int throttle = map(x, 512 + backlash, 1023, 0, 255);
-      msg.payloadA = throttle;
-      msg.payloadB = throttle;
-    }
-  }
-  return msg;
-}  
-
 

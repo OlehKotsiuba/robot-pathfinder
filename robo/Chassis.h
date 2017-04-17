@@ -10,12 +10,10 @@ enum State {
 
 class Chassis {
   private:
+  volatile static long leftEncoderCount;
+  volatile static long rightEncoderCount;
   Motor *leftMotor, *rightMotor;
-  void (*encoderListener)(long, long);
-  void (*finishMoveListener)();
-  void (*errorListener)(long);
-  volatile long leftEncoderCount = 0;
-  volatile long rightEncoderCount = 0;
+  void (*encoderListener)(long, long) = NULL;
   long lastTickTime = 0;
   int targetPath = 0;
   State state = STOP;
@@ -28,10 +26,7 @@ class Chassis {
   void checkBalance();
   
   public:
-  Chassis(Motor *lMotor, Motor *rMotor);
-  void onLeftEncoderTick();
-  void onRightEncoderTick();
-
+  Chassis(byte, byte, byte, byte, byte, byte, byte);
   void forward();
   void backward();
   void forward(int);
@@ -44,10 +39,11 @@ class Chassis {
   void brake();
   bool isStopped();
   bool isMovingForward();
-  long getLeftEncoderCount();
-  long getRightEncoderCount();
   void setEncoderDataListener(void (*listener)(int, int));
-  void setFinishMoveListener(void (*listener)());
   bool tick();
+
+  static void attachInterrupts(byte, byte); 
+  static void onLeftInterrupt();
+  static void onRightInterrupt();
 };
 
