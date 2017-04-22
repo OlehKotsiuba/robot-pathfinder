@@ -1,9 +1,17 @@
 #include <SPI.h>
 #include "RF24.h"
 #include "Message.h"
+#include <Psx.h> 
+
+Psx Psx;
 
 #define X_AXIS_PIN A0
 #define Y_AXIS_PIN A1
+
+#define dataPin 5
+#define cmndPin 2
+#define attPin 3
+#define clockPin 4
 
 RF24 radio(7,8);
 
@@ -14,13 +22,14 @@ void setup() {
   
   radio.begin();
 
-  radio.setPALevel(RF24_PA_LOW);
   radio.setPayloadSize(5);
 
   radio.openWritingPipe(addresses[0]);
   radio.openReadingPipe(1,addresses[1]);
 
-  radio.stopListening();
+  radio.startListening();
+
+  Psx.setupPins(dataPin, cmndPin, attPin, clockPin, 10);
 }
 
 void loop() {
@@ -43,17 +52,26 @@ void loop() {
         break;
       }
    }
-  
+
+
   if(Serial.available()) {
     char serialInMsg[20];
     byte length = Serial.readBytesUntil('\n', serialInMsg, sizeof(serialInMsg));
     serialInMsg[length] = '\0';
     Message outRadioMessage = getMessageFromSerial(serialInMsg);
     radio.stopListening();
-    byte retry = 0;
     radio.write( &outRadioMessage, sizeof(Message));
+    radio.startListening();
+    return;
   }
 
+  unsigned int buttonState = Psx.read();
+
+  Serial.println(buttonState & 2);
+
+  Message outRadioMessage = getMessageFromController(buttonState);
+  radio.stopListening();
+  radio.write( &outRadioMessage, sizeof(Message));
   radio.startListening();
 }
 
@@ -91,5 +109,29 @@ Message getMessageFromSerial(char * serialInMsg) {
       break;
     }
     return msg;
+}
+
+Message getMessageFromController(unsigned int state) {
+  Message msg;
+  int x = analogRead(A4) - 512;
+  int y = analogRead(A5) - 512;
+  if(state & 1) {
+    msg.type = TURN_LEFT_MESSAGE;
+  } else if(state& 2) {
+    msg.type = MOVE_BACKWARD_MESSAGE;
+  } else if (state & 4) {
+    msg.type = TURN_RIGHT_MESSAGE;
+  } else if (state & 8) {
+    msg.type = MOVE_FORWARD_MESSAGE;
+  } else if (abs(x) > 100 || abs(y) > 100 ) {
+    if (abs(x) > abs(y)) {
+      msg.type = x > 0 ? MOVE_FORWARD_MESSAGE : MOVE_BACKWARD_MESSAGE;
+    } else {
+      msg.type = y > 0 ? TURN_LEFT_MESSAGE : TURN_RIGHT_MESSAGE;
+    }
+  } else {
+    msg.type = STOP_MESSAGE; 
+  }
+  return msg;
 }
 

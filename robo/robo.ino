@@ -25,8 +25,7 @@ long lastMessageTime = 0;
 
 void setup() {
   radio.begin();
-
-  radio.setPALevel(RF24_PA_LOW);
+  
   radio.setPayloadSize(5);
 
   radio.openWritingPipe(addresses[1]);
