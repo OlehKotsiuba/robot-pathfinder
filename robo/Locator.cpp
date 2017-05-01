@@ -15,12 +15,11 @@ int Locator::echo() {
 }
 
 
-Locator::Locator(byte servoPin, byte echoPin, byte trigPin, int scanDelay, byte scanWidth):
-servoPin(servoPin), echoPin(echoPin), trigPin(trigPin), scanDelay(scanDelay), scanWidth(scanWidth){
-  pinMode(echoPin, INPUT);
-  pinMode(trigPin, OUTPUT);
-  servo.attach(servoPin);
-  servo.write(90);
+Locator::Locator(){}
+
+void Locator::rotate(int angle) {
+  int realAngle = map(angle + 90, 0, 180, MIN_ANGLE, MAX_ANGLE);
+  servo.write(realAngle);
 }
 
 void Locator::switchDirection() {
@@ -30,7 +29,7 @@ void Locator::switchDirection() {
 
 int Locator::scan(int angle) {
   if (position != angle) {
-    servo.write(angle);
+    rotate(angle);
     delay(abs(position - angle) * 4);
     position = angle;
   }
@@ -58,4 +57,13 @@ void Locator::setLocatorDataListener(void(*listener)(int, int)) {
   locatorListener = listener;
 }
 
+void Locator::attachServo(byte pin) {
+  servo.attach(pin);
+  servo.write((MAX_ANGLE - MIN_ANGLE) / 2 + MIN_ANGLE);
+}
+
+void Locator::attachSonicSensor(byte echoPin, byte trigPin) {
+  this->echoPin = echoPin;
+  this->trigPin = trigPin;
+}
 

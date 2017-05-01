@@ -1,31 +1,22 @@
+#ifndef MOTOR_H
+#define MOTOR_H
+
 #include <Arduino.h>
 
 class Motor {
-  
   private:
-  byte throttlePin;
-  byte forwardPin;
-  byte backwardPin;
-  byte maxThrottle;
-  byte forwardPinState;
-  byte backwardPinState;
-  bool paused = false;
-  int throttleAdjustment = 0;
-    
+  byte throttlePin, forwardPin, reversePin;
+  int throttleAdjustment;
+  byte throttle = 200;
+  
   public:
-  byte throttle;
-  Motor(int throttlePin, int forwardPin, int backwardPin, int maxThrottle);
-  void setThrottle(int throttle);
-  void adjustThrottle(int adjustment);
-  int getThrottle();
-  void setForwardPinState(byte state);
-  void setBackwardPinState(byte state);
+  Motor();
+  void attach(byte, byte, byte);
+  void setThrottle(byte);
+  void adjustThrottle(int);
   void forward();
-  void backward();
+  void reverse();
   void stop();
-  void pause();
-  void resume();
-
 };
 
-
+#endif

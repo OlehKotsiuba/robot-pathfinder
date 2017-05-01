@@ -1,42 +1,40 @@
 #include "Motor.h"
 
-Motor::Motor(int throttlePin, int forwardPin, int backwardPin, int maxThrottle) {
-  this->throttlePin = throttlePin;
-  this->forwardPin = forwardPin;
-  this->backwardPin = backwardPin;
-  this->maxThrottle = maxThrottle;
-  setThrottle(maxThrottle * 0.7);
-  pinMode(throttlePin, OUTPUT);
-  pinMode(forwardPin, OUTPUT);
-  pinMode(backwardPin, OUTPUT);
+Motor::Motor() {
 }
 
-void Motor::setThrottle(int throttle) {
+void Motor::attach(byte throttlePin, byte forwardPin, byte reversePin) {
+  this->throttlePin = throttlePin;
+  this->forwardPin = forwardPin;
+  this->reversePin = reversePin;
+  setThrottle(200);
+  pinMode(throttlePin, OUTPUT);
+  pinMode(forwardPin, OUTPUT);
+  pinMode(reversePin, OUTPUT);
+}
+
+void Motor::setThrottle(byte throttle) {
   this->throttle = throttle;
-  analogWrite(throttlePin, constrain(throttle + throttleAdjustment, 0 ,maxThrottle));
+  analogWrite(throttlePin, constrain(throttle + throttleAdjustment, 0 , 255));
 }
 
 void Motor::adjustThrottle(int adjustment) {
   throttleAdjustment = adjustment;
-  analogWrite(throttlePin, constrain(throttle + throttleAdjustment, 0 ,maxThrottle));
-}
-
-int Motor::getThrottle() {
-  return throttle;
+  analogWrite(throttlePin, constrain(throttle + throttleAdjustment, 0 , 255));
 }
 
 void Motor::forward() {
   digitalWrite(forwardPin, HIGH);
-  digitalWrite(backwardPin, LOW);
+  digitalWrite(reversePin, LOW);
 }
 
-void Motor::backward() {
+void Motor::reverse() {
   digitalWrite(forwardPin, LOW);
-  digitalWrite(backwardPin, HIGH);
+  digitalWrite(reversePin, HIGH);
 }
 
 void Motor::stop(){
   digitalWrite(forwardPin, LOW);
-  digitalWrite(backwardPin, LOW);
+  digitalWrite(reversePin, LOW);
 }
 

@@ -12,7 +12,7 @@ class Chassis {
   private:
   volatile static long leftEncoderCount;
   volatile static long rightEncoderCount;
-  Motor *leftMotor, *rightMotor;
+  Motor leftMotor, rightMotor;
   void (*encoderListener)(long, long) = NULL;
   long lastTickTime = 0;
   int targetPath = 0;
@@ -26,7 +26,9 @@ class Chassis {
   void checkBalance();
   
   public:
-  Chassis(byte, byte, byte, byte, byte, byte, byte);
+  Chassis();
+  void attachLeftMotor(byte, byte, byte);
+  void attachRightMotor(byte, byte, byte);
   void forward();
   void backward();
   void forward(int);
@@ -35,6 +37,7 @@ class Chassis {
   void turnRight();
   void turnLeft(int);
   void turnRight(int);
+  void turn(int);
   void stop();
   void brake();
   bool isStopped();

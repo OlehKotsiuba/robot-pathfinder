@@ -1,7 +1,7 @@
 #include "Chassis.h"
 
 #define TICKS_IN_CM 3.9
-#define TICKS_IN_DEG 0.75
+#define TICKS_IN_DEG 0.24
 
 void Chassis::stateChanged() {
   if (encoderListener != NULL) {
@@ -17,20 +17,25 @@ void Chassis::reset() {
   startMoveTime = millis();
 }
 
-Chassis::Chassis(byte lThrottlePin, byte lForwardPin, byte lReversePin, byte rThrottlePin, byte rForwardPin, byte  rReversePin, byte maxThrottle){
-  leftMotor = new Motor(lThrottlePin, lForwardPin, lReversePin, 200);
-  rightMotor = new Motor(rThrottlePin, rForwardPin, rReversePin, 200);
+Chassis::Chassis(){}
+
+void Chassis::attachLeftMotor(byte throttlePin, byte forwardPin, byte reversePin) {
+ leftMotor.attach(throttlePin, forwardPin, reversePin); 
+}
+
+void Chassis::attachRightMotor(byte throttlePin, byte forwardPin, byte reversePin) {
+ rightMotor.attach(throttlePin, forwardPin, reversePin); 
 }
 
 void Chassis::checkBalance() {
   int p = 10;
   int error = leftEncoderCount - rightEncoderCount;
   if (error != 0) {
-    leftMotor->adjustThrottle(-error * p);
-    rightMotor->adjustThrottle(error * p);
+    leftMotor.adjustThrottle(-error * p);
+    rightMotor.adjustThrottle(error * p);
   } else {
-    leftMotor->adjustThrottle(0);
-    rightMotor->adjustThrottle(0);
+    leftMotor.adjustThrottle(0);
+    rightMotor.adjustThrottle(0);
   }
 }
 
@@ -46,8 +51,8 @@ void Chassis::forward() {
   if (state != MOVING_FORWARD) {
     stateChanged();
     state = MOVING_FORWARD;
-    leftMotor->forward();
-    rightMotor->forward();
+    leftMotor.forward();
+    rightMotor.forward();
   }
 }
 
@@ -60,8 +65,8 @@ void Chassis::backward() {
   if (state != MOVING_BACKWARD) {
     stateChanged();
     state = MOVING_BACKWARD;
-    leftMotor->backward();
-    rightMotor->backward();
+    leftMotor.reverse();
+    rightMotor.reverse();
   }
 }
 
@@ -74,8 +79,8 @@ void Chassis::turnLeft() {
   if (state != TURNING_LEFT) {
     stateChanged();
     state = TURNING_LEFT;
-    leftMotor->backward();
-    rightMotor->forward();
+    leftMotor.reverse();
+    rightMotor.forward();
   }  
 }
 
@@ -88,8 +93,8 @@ void Chassis::turnRight() {
   if (state != TURNING_RIGHT) {
     stateChanged();
     state = TURNING_RIGHT;
-    leftMotor->forward();
-    rightMotor->backward();
+    leftMotor.forward();
+    rightMotor.reverse();
   }
 }
 
@@ -98,30 +103,35 @@ void Chassis::turnRight(int angle) {
   targetPath = angle * TICKS_IN_DEG;
 }
 
+void Chassis::turn(int angle) {
+  if (angle > 0) turnLeft(angle);
+  else turnRight(abs(angle));
+}
+
 void Chassis::stop() {
   if (state != STOP) {
   //brake();
   stateChanged();
   state = STOP;
-  leftMotor->stop();
-  rightMotor->stop();  
+  leftMotor.stop();
+  rightMotor.stop();  
   }
 }
 
 void Chassis::brake() {
   long moveTime = millis() - startMoveTime;
   if (state == TURNING_LEFT) {
-    leftMotor->forward();
-    rightMotor->backward();
+    leftMotor.forward();
+    rightMotor.reverse();
   } else if (state == TURNING_RIGHT) {
-    leftMotor->backward();
-    rightMotor->forward();
+    leftMotor.reverse();
+    rightMotor.forward();
   } else if (state == MOVING_FORWARD) {
-    leftMotor->backward();
-    rightMotor->backward();
+    leftMotor.reverse();
+    rightMotor.reverse();
   } else if (state == MOVING_BACKWARD) {
-    leftMotor->forward();
-    rightMotor->forward();
+    leftMotor.forward();
+    rightMotor.forward();
   }
   delay(constrain(moveTime / 10, 0, 200));
 }

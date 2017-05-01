@@ -53,7 +53,6 @@ void loop() {
       }
    }
 
-
   if(Serial.available()) {
     char serialInMsg[20];
     byte length = Serial.readBytesUntil('\n', serialInMsg, sizeof(serialInMsg));
@@ -66,8 +65,6 @@ void loop() {
   }
 
   unsigned int buttonState = Psx.read();
-
-  Serial.println(buttonState & 2);
 
   Message outRadioMessage = getMessageFromController(buttonState);
   radio.stopListening();

@@ -9,7 +9,7 @@ IntList pressedKeys = new IntList();
 
 void setup() {
   size(450,300);
-  port = new Serial(this, "COM7", 115200); 
+  port = new Serial(this, "COM3", 115200); 
   port.bufferUntil('\n'); 
   createGUI();
   locator = new Locator(locatorSketchPad);
