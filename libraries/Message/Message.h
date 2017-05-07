@@ -1,27 +1,34 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-enum MessageType {
-	MOVE_FORWARD_MESSAGE,
-	MOVE_BACKWARD_MESSAGE,
-	TURN_LEFT_MESSAGE,
-	TURN_RIGHT_MESSAGE,
-	MOVE_FORWARD_BY_MESSAGE,
-	MOVE_BACKWARD_BY_MESSAGE,
-	TURN_LEFT_BY_MESSAGE,
-	TURN_RIGHT_BY_MESSAGE,
-	STOP_MESSAGE,
-	PRINT_MESSAGE,
-	SPEED_MESSAGE,
-	JOYSTICK_MESSAGE,
-	ENCODER_DATA_MESSAGE,
-	LOCATOR_DATA_MESSAGE
-};
-
 struct Message {
-	byte type;
-	int payloadA;
-	int payloadB;
+	struct shortData {
+		int l;
+		int h;
+	};
+	
+	union Payload{
+		byte bytes[4];
+		shortData words;
+		long dWord;
+	};
+	
+	enum Type: byte {
+		MOVE_ANALOG,
+		MOVE_FORWARD,
+		MOVE_BACKWARD,
+		TURN_LEFT,
+		TURN_RIGHT,
+		STOP,
+		PRINT,
+		SPEED,
+		ENCODER_DATA,
+		LOCATOR_DATA,
+		SET_MODE
+	};
+	
+	Type type;
+	Payload payload;
 };
 
 #endif

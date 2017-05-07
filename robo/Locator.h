@@ -4,8 +4,12 @@
 #define LEFT 0
 #define RIGHT 1
 #define TIMEOUT 7000
-#define MAX_ANGLE 150
-#define MIN_ANGLE 17
+#define MAX_ANGLE 180
+#define MIN_ANGLE 10
+#define MAX_DISTANCE 110
+#define SCAN_SHIFT 20
+
+#define Swap(x,y); x ^= y; y ^= x; x ^=y;
 
 class Locator {
   private:

@@ -38,17 +38,17 @@ void loop() {
       Message inRadioMessage;   
       radio.read(&inRadioMessage,sizeof(Message));
       switch (inRadioMessage.type) {
-        case ENCODER_DATA_MESSAGE: 
+        case Message::ENCODER_DATA: 
           Serial.print("E,");
-          Serial.print(inRadioMessage.payloadA);
+          Serial.print(inRadioMessage.payload.words.l);
           Serial.print(",");
-          Serial.println(inRadioMessage.payloadB); 
+          Serial.println(inRadioMessage.payload.words.h); 
         break;
-        case LOCATOR_DATA_MESSAGE:
+        case Message::LOCATOR_DATA:
           Serial.print("l,");
-          Serial.print(inRadioMessage.payloadA);
+          Serial.print(inRadioMessage.payload.words.l);
           Serial.print(",");
-          Serial.println(inRadioMessage.payloadB); 
+          Serial.println(inRadioMessage.payload.words.h); 
         break;
       }
    }
@@ -77,31 +77,31 @@ Message getMessageFromSerial(char * serialInMsg) {
    char *msgType = strtok(serialInMsg, ",");
     switch(msgType[0]) {
       case 'F': {
-        msg.type = MOVE_FORWARD_MESSAGE;
+        msg.type = Message::MOVE_FORWARD;
         //msg.payloadA = atoi(strtok(NULL, ","));
         //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break;
       case 'B': {
-        msg.type = MOVE_BACKWARD_MESSAGE;
+        msg.type = Message::MOVE_BACKWARD;
         //msg.payloadA = atoi(strtok(NULL, ","));
         //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break; 
       case 'L': {
-        msg.type = TURN_LEFT_MESSAGE;
+        msg.type = Message::TURN_LEFT;
         //msg.payloadA = atoi(strtok(NULL, ","));
         //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break; 
       case 'R': {
-        msg.type = TURN_RIGHT_MESSAGE;
+        msg.type = Message::TURN_RIGHT;
         //msg.payloadA = atoi(strtok(NULL, ","));
         //msg.payloadB = atoi(strtok(NULL, ","));
       }
       break;
       case 'S': {
-        msg.type = STOP_MESSAGE;
+        msg.type = Message::STOP;
       }
       break;
     }
@@ -110,24 +110,35 @@ Message getMessageFromSerial(char * serialInMsg) {
 
 Message getMessageFromController(unsigned int state) {
   Message msg;
-  int x = analogRead(A4) - 512;
-  int y = analogRead(A5) - 512;
-  if(state & 1) {
-    msg.type = TURN_LEFT_MESSAGE;
-  } else if(state& 2) {
-    msg.type = MOVE_BACKWARD_MESSAGE;
-  } else if (state & 4) {
-    msg.type = TURN_RIGHT_MESSAGE;
-  } else if (state & 8) {
-    msg.type = MOVE_FORWARD_MESSAGE;
-  } else if (abs(x) > 100 || abs(y) > 100 ) {
-    if (abs(x) > abs(y)) {
-      msg.type = x > 0 ? MOVE_FORWARD_MESSAGE : MOVE_BACKWARD_MESSAGE;
-    } else {
-      msg.type = y > 0 ? TURN_LEFT_MESSAGE : TURN_RIGHT_MESSAGE;
-    }
+  long x = analogRead(A4) - 512;
+  long y = analogRead(A5) - 512;
+  if(state & psxLeft) {
+    msg.type = Message::TURN_LEFT;
+  } else if(state& psxDown) {
+    msg.type = Message::MOVE_BACKWARD;
+  } else if (state & psxRight) {
+    msg.type = Message::TURN_RIGHT;
+  } else if (state & psxUp) {
+    msg.type = Message::MOVE_FORWARD;
+  } else if (abs(x) > 25 || abs(y) > 25 ) {
+    msg.type = Message::MOVE_ANALOG;
+    long length = constrain(sqrt(x*x + y*y) / 2, 0, 255);
+    if (x < 0) length = -length;
+    msg.payload.words.l = length;
+    msg.payload.words.h = length;
+    if (y > 0) {
+      msg.payload.words.l = (long)msg.payload.words.l * (512 - y) / 512; 
+    } else if (y < 0) {
+      msg.payload.words.h = (long)msg.payload.words.h * (512 + y) / 512;
+    }  
+  } else if (state & psxSqu) {
+    msg.type = Message::SET_MODE;
+    msg.payload.dWord = 0;
+  } else if (state & psxTri) {
+    msg.type = Message::SET_MODE;
+    msg.payload.dWord = 1;
   } else {
-    msg.type = STOP_MESSAGE; 
+    msg.type = Message::Type::STOP; 
   }
   return msg;
 }

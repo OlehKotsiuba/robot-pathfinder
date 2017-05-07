@@ -1,16 +1,18 @@
 #include "Chassis.h"
 
 #define TICKS_IN_CM 3.9
-#define TICKS_IN_DEG 0.24
+#define TICKS_IN_DEG 0.28
 
 void Chassis::stateChanged() {
   if (encoderListener != NULL) {
     (*encoderListener)(leftEncoderCount, rightEncoderCount);
-    reset();
   }
+  reset();
 }
 
 void Chassis::reset() {
+  leftMotor.setThrottle(200);
+  rightMotor.setThrottle(200);
   leftEncoderCount = 0;
   rightEncoderCount = 0;
   targetPath = 0;
@@ -28,7 +30,7 @@ void Chassis::attachRightMotor(byte throttlePin, byte forwardPin, byte reversePi
 }
 
 void Chassis::checkBalance() {
-  int p = 10;
+  int p = 20;
   int error = leftEncoderCount - rightEncoderCount;
   if (error != 0) {
     leftMotor.adjustThrottle(-error * p);
@@ -59,6 +61,19 @@ void Chassis::forward() {
 void Chassis::forward(int distance) {
   forward();
   targetPath = distance * TICKS_IN_CM;
+}
+
+void Chassis::analog(int lThrottle, int rThrottle) {
+  if (state != ANALOG) {
+    state = ANALOG;
+    stateChanged();
+  }
+  leftMotor.setThrottle(lThrottle);
+  rightMotor.setThrottle(rThrottle);
+  if (lThrottle >= 0) leftMotor.forward();
+  else leftMotor.reverse();
+  if (rThrottle >= 0) rightMotor.forward();
+  else rightMotor.reverse();
 }
 
 void Chassis::backward() {
@@ -150,9 +165,10 @@ bool Chassis::isMovingForward() {
 }
 
 bool Chassis::tick() {
+  if (state == ANALOG || state == STOP) return;
   checkBalance();
   checkPath();
-  return (state == STOP);
+  return;
 }
 
 void Chassis::attachInterrupts(byte leftPin, byte rightPin) {

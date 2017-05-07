@@ -7,7 +7,7 @@
 
 #define SCAN_DELAY 100
 #define SAFE_DISTANCE 20
-#define SCAN_ANGLE 45
+#define SCAN_ANGLE 90
 #define SCAN_RESOLUTION 180 / SCAN_ANGLE
 
 RF24 radio(7,8);
@@ -23,14 +23,17 @@ struct Path {
   int distance;
 };
 
-enum RobotState {
-  MOVE,
-  IDLE
-};
+enum Mode: byte {
+  MANUAL = 0,
+  AUTO = 1
+} mode = MANUAL;
 
-volatile RobotState state = IDLE;
+enum State: byte {
+  PATH_FINDING,
+  MOVING
+} state = PATH_FINDING;
 
-long lastMessageTime = 0;
+long lastMessageReceived = 0;
 
 void setup() {
   radio.begin();
@@ -49,15 +52,15 @@ void setup() {
   Chassis::attachInterrupts(2,3);
 
   locator.attachServo(10);
-  locator.attachSonicSensor( A1, A2);
-  //locator->setLocatorDataListener(sendLocatorData);
+  locator.attachSonicSensor(A3, A2);
+//  locator->setLocatorDataListener(sendLocatorData);
 }
 
 Path findBestPath() {
   Path bestPath;
-  byte bestScore;
+  unsigned int bestScore;
   for(byte i = 0; i <= 180 / SCAN_ANGLE ; i++) {
-    int angle = i * SCAN_ANGLE - 90;
+    int angle = i * SCAN_ANGLE;
     byte distance = locator.scan(angle);
     if (distance > SAFE_DISTANCE) { 
       int score = getPathScore(angle, distance);
@@ -72,13 +75,51 @@ Path findBestPath() {
 }
 
 int getPathScore(int angle, int distance) {
-  int direction = currentAngle + angle;
+  int direction = currentAngle + angle - 90;
     if (abs(direction) > 180) {
       direction %= 180;
       direction = direction > 0 ? 180 - direction : 180 + direction;
     }
   return (180 - abs(direction)) / 9 * distance;
 }
+
+bool tryMoveForward() {
+  int distance = locator.scan(90);
+  if (distance > SAFE_DISTANCE){
+    chassis.forward(distance - SAFE_DISTANCE);
+    return true;
+  }
+  return false;
+}
+
+bool tryTurnRight() {
+  int distance = locator.scan(180);
+   if (distance > SAFE_DISTANCE){
+    chassis.turn(90);
+    currentAngle += 90;
+    if (currentAngle > 180) currentAngle =- 360;
+    return true;
+  }
+  return false;
+}
+
+bool tryTurnLeft() {
+  int distance = locator.scan(0);
+   if (distance > SAFE_DISTANCE){
+    chassis.turn(-90);
+    currentAngle -= 90;
+    if (currentAngle < -180) currentAngle =+ 360;
+    return true;
+  }
+  return false;
+}
+
+bool rotate() {
+  chassis.turn(180);
+  currentAngle += 180;
+  if (currentAngle > 180) -180 + currentAngle % 180;
+}
+
 
 void loop()
 {
@@ -87,58 +128,86 @@ void loop()
     while(radio.available()) { 
       radio.read(&inRadiomessage,sizeof(Message)); // Get the most recent message from buffer
     }
-    processMessage(inRadiomessage);
+    processMessage(&inRadiomessage);
+    lastMessageReceived = millis();
   }
-
-//  if (chassis.isStopped()) {
-//    Path bestPath = findBestPath();
-//    chassis.turn(bestPath.angle);
-//    currentAngle += bestPath.angle;
-//    while(!chassis.tick());
-//    chassis.forward(bestPath.distance );  
-//  } else if (chassis.isMovingForward()) {
-//    if (locator.scan(0) > SAFE_DISTANCE) chassis.stop();
-//  }
-//  chassis.tick();
+  switch(mode) {
+    case MANUAL:
+      if (millis() - lastMessageReceived > 500) chassis.stop();
+    break;
+    case AUTO:
+      if (chassis.isStopped()) {
+        bool result = false;
+        if (currentAngle > 0) {
+           result = tryTurnLeft();
+           if (!result) result = tryMoveForward();
+           if (!result) result = tryTurnRight();
+           if (!result) rotate();
+         } else if (currentAngle < 0) {
+           result = tryTurnRight();
+           if (!result) result = tryMoveForward();
+           if (!result) result = tryTurnLeft();
+           if (!result) rotate();
+         } else {
+           result = tryMoveForward();
+           if (!result) result = tryTurnRight();
+           if (!result) result = tryTurnLeft();
+           if (!result) rotate();
+         }
+      } else if (chassis.isMovingForward()) {
+        if (locator.scan(90) < SAFE_DISTANCE) chassis.stop();
+      }
+    break;
+  }
+  chassis.tick();
 }
 
-
-
 void sendEncoderData(long leftCount, long rightCount) {
-  sendMessage(ENCODER_DATA_MESSAGE, leftCount, rightCount);
+  sendMessage(Message::ENCODER_DATA, leftCount, rightCount);
 }
 
 void sendLocatorData(int position, int distance) {
-  sendMessage(LOCATOR_DATA_MESSAGE, position, distance);
+  sendMessage(Message::LOCATOR_DATA, position, distance);
 }
 
-void sendMessage(MessageType type, int payloadA, int payloadB) {
+void sendMessage(Message::Type type, int lowWord, int highWord) {
   Message message;
-  message.payloadA = payloadA;
-  message.payloadB = payloadB;
+  message.payload.words.l = lowWord;
+  message.payload.words.h = highWord;
   byte retry = 0;
   radio.stopListening();
   radio.write(&message, sizeof(message));
   radio.startListening();
 }
 
-void processMessage(Message msg) {
-     switch(msg.type) {
-      case MOVE_FORWARD_MESSAGE:
+void processMessage(Message *msg) {
+  if (mode == MANUAL) processManualMoveMessage(msg);
+  switch(msg->type) {
+    case Message::SET_MODE:
+      mode = msg->payload.dWord;
+    break;
+  }
+}
+
+void processManualMoveMessage(Message *msg) {
+  switch(msg->type) {
+      case Message::MOVE_ANALOG:
+        chassis.analog(msg->payload.words.l, msg->payload.words.h);
+      break;
+      case Message::MOVE_FORWARD:
         chassis.forward();
       break;
-      case MOVE_BACKWARD_MESSAGE:
+      case Message::MOVE_BACKWARD:
         chassis.backward();
       break;
-      case TURN_LEFT_MESSAGE:
+      case Message::TURN_LEFT:
         chassis.turnLeft();
       break;
-      case TURN_RIGHT_MESSAGE:
+      case Message::TURN_RIGHT:
         chassis.turnRight();
       break;
-      case STOP_MESSAGE:
+      case Message::STOP:
         chassis.stop();
-      break;
-    }
+  }
 }
 

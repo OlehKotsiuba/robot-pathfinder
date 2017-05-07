@@ -9,7 +9,7 @@ int Locator::echo() {
   digitalWrite(trigPin, LOW);
   impulseTime = pulseIn(echoPin, HIGH, TIMEOUT);
   interrupts();
-  if (impulseTime == 0) distance = 110;
+  if (impulseTime == 0) distance = MAX_DISTANCE;
   else distance = impulseTime / 58;
   return distance;
 }
@@ -18,8 +18,10 @@ int Locator::echo() {
 Locator::Locator(){}
 
 void Locator::rotate(int angle) {
-  int realAngle = map(angle + 90, 0, 180, MIN_ANGLE, MAX_ANGLE);
-  servo.write(realAngle);
+  byte servoAngle = map(angle, 0, 180, MIN_ANGLE, MAX_ANGLE);
+  servo.write(servoAngle);
+  delay(abs(position - angle) * 4);
+  position = angle;
 }
 
 void Locator::switchDirection() {
@@ -30,8 +32,6 @@ void Locator::switchDirection() {
 int Locator::scan(int angle) {
   if (position != angle) {
     rotate(angle);
-    delay(abs(position - angle) * 4);
-    position = angle;
   }
   return echo();
 }
@@ -65,5 +65,7 @@ void Locator::attachServo(byte pin) {
 void Locator::attachSonicSensor(byte echoPin, byte trigPin) {
   this->echoPin = echoPin;
   this->trigPin = trigPin;
+  pinMode(echoPin, INPUT);
+  pinMode(trigPin, OUTPUT);
 }
 

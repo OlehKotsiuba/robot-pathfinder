@@ -1,15 +1,15 @@
 #include "Motor.h"
 
-enum State {
-  STOP,
-  MOVING_FORWARD,
-  MOVING_BACKWARD,
-  TURNING_LEFT,
-  TURNING_RIGHT
-};
-
 class Chassis {
-  private:
+  enum State {
+    STOP,
+    MOVING_FORWARD,
+    MOVING_BACKWARD,
+    TURNING_LEFT,
+    TURNING_RIGHT,
+    ANALOG
+  };
+
   volatile static long leftEncoderCount;
   volatile static long rightEncoderCount;
   Motor leftMotor, rightMotor;
@@ -33,6 +33,7 @@ class Chassis {
   void backward();
   void forward(int);
   void backward(int);
+  void analog(int, int);
   void turnLeft();
   void turnRight();
   void turnLeft(int);
