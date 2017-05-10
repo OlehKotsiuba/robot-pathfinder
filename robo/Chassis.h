@@ -19,6 +19,7 @@ class Chassis {
   State state = STOP;
   int lThrottle, rThrottle;
   unsigned long startMoveTime = 0;
+  byte throttle = 200;
 
   void stateChanged();
   void reset();
@@ -39,12 +40,13 @@ class Chassis {
   void turnLeft(int);
   void turnRight(int);
   void turn(int);
+  void setThrottle(byte);
   void stop();
   void brake();
   bool isStopped();
   bool isMovingForward();
   void setEncoderDataListener(void (*listener)(int, int));
-  bool tick();
+  void tick();
 
   static void attachInterrupts(byte, byte); 
   static void onLeftInterrupt();

@@ -112,6 +112,8 @@ Message getMessageFromController(unsigned int state) {
   Message msg;
   long x = analogRead(A4) - 512;
   long y = analogRead(A5) - 512;
+  int hX = analogRead(A6) - 512;
+  int hY = analogRead(A7) - 512; 
   if(state & psxLeft) {
     msg.type = Message::TURN_LEFT;
   } else if(state& psxDown) {
@@ -131,7 +133,11 @@ Message getMessageFromController(unsigned int state) {
     } else if (y < 0) {
       msg.payload.words.h = (long)msg.payload.words.h * (512 + y) / 512;
     }  
-  } else if (state & psxSqu) {
+  } else if (abs(hX) > 25 || abs(hY) > 25) {
+     msg.type = Message::SET_HEADING;
+     msg.payload.words.l = atan2(hX, hY) / 180 * PI;
+  }
+  else if (state & psxSqu) {
     msg.type = Message::SET_MODE;
     msg.payload.dWord = 0;
   } else if (state & psxTri) {

@@ -1,9 +1,11 @@
 
 #include <RF24.h>
-
+#include "I2Cdev.h"
+#include "HMC5883L.h"
 #include "Message.h"
 #include "Chassis.h"
 #include "Locator.h"
+
 
 #define SCAN_DELAY 100
 #define SAFE_DISTANCE 20
@@ -11,12 +13,15 @@
 #define SCAN_RESOLUTION 180 / SCAN_ANGLE
 
 RF24 radio(7,8);
+HMC5883L mag;
 
 byte addresses[][6] = {"1Node","2Node"};
 
 Locator locator;
 Chassis chassis;
 int currentAngle = 0;
+
+int targetHeading= 0;
 
 struct Path {
   int angle;
@@ -35,15 +40,69 @@ enum State: byte {
 
 long lastMessageReceived = 0;
 
+void sendEncoderData(long leftCount, long rightCount) {
+  sendMessage(Message::ENCODER_DATA, leftCount, rightCount);
+}
+
+void sendLocatorData(int position, int distance) {
+  sendMessage(Message::LOCATOR_DATA, position, distance);
+}
+
+void sendMessage(Message::Type type, int lowWord, int highWord) {
+  Message message;
+  message.payload.words.l = lowWord;
+  message.payload.words.h = highWord;
+  byte retry = 0;
+  radio.stopListening();
+  radio.write(&message, sizeof(message));
+  radio.startListening();
+}
+
+void processMessage(Message *msg) {
+  if (mode == MANUAL) processManualMoveMessage(msg);
+  switch(msg->type) {
+    case Message::SET_MODE:
+      mode = msg->payload.dWord;
+    case Message::SET_HEADING:
+      targetHeading = msg->payload.words.l;
+    break;
+  }
+}
+
+void processManualMoveMessage(Message *msg) {
+  switch(msg->type) {
+      case Message::MOVE_ANALOG:
+        chassis.analog(msg->payload.words.l, msg->payload.words.h);
+      break;
+      case Message::MOVE_FORWARD:
+        chassis.forward();
+      break;
+      case Message::MOVE_BACKWARD:
+        chassis.backward();
+      break;
+      case Message::TURN_LEFT:
+        chassis.turnLeft();
+      break;
+      case Message::TURN_RIGHT:
+        chassis.turnRight();
+      break;
+      case Message::STOP:
+        chassis.stop();
+  }
+}
+
 void setup() {
+  //Serial.begin(115200);
   radio.begin();
-  
   radio.setPayloadSize(sizeof(Message)); // Default payload size is 32 bytes. If we dont specify it, unused bytes of message will be filled with zeros
 
   radio.openWritingPipe(addresses[1]);
   radio.openReadingPipe(1,addresses[0]);
 
   radio.startListening(); // Entering receiver mode
+
+  Wire.begin();
+  mag.initialize();
   
   chassis.setEncoderDataListener(sendEncoderData);
   chassis.attachLeftMotor(6, 4, 0);
@@ -54,6 +113,13 @@ void setup() {
   locator.attachServo(10);
   locator.attachSonicSensor(A3, A2);
 //  locator->setLocatorDataListener(sendLocatorData);
+}
+
+int getHeading() {
+  int mx, my, mz;
+  mag.getHeading(&mx, &my, &mz);
+  float heading = atan2(my, mx);
+  return heading * 180/PI;
 }
 
 Path findBestPath() {
@@ -120,7 +186,6 @@ bool rotate() {
   if (currentAngle > 180) -180 + currentAngle % 180;
 }
 
-
 void loop()
 {
   Message inRadiomessage;
@@ -136,78 +201,43 @@ void loop()
       if (millis() - lastMessageReceived > 500) chassis.stop();
     break;
     case AUTO:
-      if (chassis.isStopped()) {
-        bool result = false;
-        if (currentAngle > 0) {
-           result = tryTurnLeft();
-           if (!result) result = tryMoveForward();
-           if (!result) result = tryTurnRight();
-           if (!result) rotate();
-         } else if (currentAngle < 0) {
-           result = tryTurnRight();
-           if (!result) result = tryMoveForward();
-           if (!result) result = tryTurnLeft();
-           if (!result) rotate();
-         } else {
-           result = tryMoveForward();
-           if (!result) result = tryTurnRight();
-           if (!result) result = tryTurnLeft();
-           if (!result) rotate();
-         }
-      } else if (chassis.isMovingForward()) {
-        if (locator.scan(90) < SAFE_DISTANCE) chassis.stop();
-      }
+//      if (chassis.isStopped()) {
+//        bool result = false;
+//        if (currentAngle > 0) {
+//           result = tryTurnLeft();
+//           if (!result) result = tryMoveForward();
+//           if (!result) result = tryTurnRight();
+//           if (!result) rotate();
+//         } else if (currentAngle < 0) {
+//           result = tryTurnRight();
+//           if (!result) result = tryMoveForward();
+//           if (!result) result = tryTurnLeft();
+//           if (!result) rotate();
+//         } else {
+//           result = tryMoveForward();
+//           if (!result) result = tryTurnRight();
+//           if (!result) result = tryTurnLeft();
+//           if (!result) rotate();
+//         }
+//      } else if (chassis.isMovingForward()) {
+//        if (locator.scan(90) < SAFE_DISTANCE) chassis.stop();
+//      }
+    int heading = getHeading();
+    int error = abs(heading - targetHeading);
+    if (error > 5) {
+        if (heading > 0) {
+          chassis.setThrottle(constrain(error*2 ,100, 255));
+          chassis.turnLeft();
+        }
+        else {
+          chassis.setThrottle(constrain(error*2 ,100, 255));
+          chassis.turnRight();
+        }
+    } else {
+      chassis.stop();
+    }
     break;
   }
-  chassis.tick();
-}
-
-void sendEncoderData(long leftCount, long rightCount) {
-  sendMessage(Message::ENCODER_DATA, leftCount, rightCount);
-}
-
-void sendLocatorData(int position, int distance) {
-  sendMessage(Message::LOCATOR_DATA, position, distance);
-}
-
-void sendMessage(Message::Type type, int lowWord, int highWord) {
-  Message message;
-  message.payload.words.l = lowWord;
-  message.payload.words.h = highWord;
-  byte retry = 0;
-  radio.stopListening();
-  radio.write(&message, sizeof(message));
-  radio.startListening();
-}
-
-void processMessage(Message *msg) {
-  if (mode == MANUAL) processManualMoveMessage(msg);
-  switch(msg->type) {
-    case Message::SET_MODE:
-      mode = msg->payload.dWord;
-    break;
-  }
-}
-
-void processManualMoveMessage(Message *msg) {
-  switch(msg->type) {
-      case Message::MOVE_ANALOG:
-        chassis.analog(msg->payload.words.l, msg->payload.words.h);
-      break;
-      case Message::MOVE_FORWARD:
-        chassis.forward();
-      break;
-      case Message::MOVE_BACKWARD:
-        chassis.backward();
-      break;
-      case Message::TURN_LEFT:
-        chassis.turnLeft();
-      break;
-      case Message::TURN_RIGHT:
-        chassis.turnRight();
-      break;
-      case Message::STOP:
-        chassis.stop();
-  }
+ chassis.tick();
 }
 

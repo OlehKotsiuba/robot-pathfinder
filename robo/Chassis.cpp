@@ -11,8 +11,8 @@ void Chassis::stateChanged() {
 }
 
 void Chassis::reset() {
-  leftMotor.setThrottle(200);
-  rightMotor.setThrottle(200);
+  leftMotor.setThrottle(throttle);
+  rightMotor.setThrottle(throttle);
   leftEncoderCount = 0;
   rightEncoderCount = 0;
   targetPath = 0;
@@ -133,6 +133,12 @@ void Chassis::stop() {
   }
 }
 
+void Chassis::setThrottle(byte throttle) {
+  this->throttle = throttle;
+  leftMotor.setThrottle(throttle);
+  rightMotor.setThrottle(throttle);
+}
+
 void Chassis::brake() {
   long moveTime = millis() - startMoveTime;
   if (state == TURNING_LEFT) {
@@ -164,7 +170,7 @@ bool Chassis::isMovingForward() {
   return state == MOVING_FORWARD;
 }
 
-bool Chassis::tick() {
+void Chassis::tick() {
   if (state == ANALOG || state == STOP) return;
   checkBalance();
   checkPath();

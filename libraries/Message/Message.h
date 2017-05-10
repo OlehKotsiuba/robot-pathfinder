@@ -24,7 +24,8 @@ struct Message {
 		SPEED,
 		ENCODER_DATA,
 		LOCATOR_DATA,
-		SET_MODE
+		SET_MODE,
+		SET_HEADING
 	};
 	
 	Type type;
