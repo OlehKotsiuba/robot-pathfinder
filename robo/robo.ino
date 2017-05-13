@@ -21,6 +21,9 @@ Locator locator;
 Chassis chassis;
 int currentAngle = 0;
 
+int previousError = 0;
+long integralError = 0;
+
 int targetHeading= 0;
 
 struct Path {
@@ -64,7 +67,8 @@ void processMessage(Message *msg) {
     case Message::SET_MODE:
       mode = msg->payload.dWord;
     case Message::SET_HEADING:
-      targetHeading = msg->payload.words.l;
+      targetHeading = 180 - abs(msg->payload.words.l);
+      
     break;
   }
 }
@@ -119,6 +123,7 @@ int getHeading() {
   int mx, my, mz;
   mag.getHeading(&mx, &my, &mz);
   float heading = atan2(my, mx);
+  if (heading < 0) heading += 2*PI;
   return heading * 180/PI;
 }
 
@@ -185,6 +190,15 @@ bool rotate() {
   currentAngle += 180;
   if (currentAngle > 180) -180 + currentAngle % 180;
 }
+long lastCheck = 0;
+byte correctChecks = 0;
+
+int getError(int heading, int target) {
+  int error = target - heading;
+  if (error > 180) error = -error + 180;
+  else if (error < -180) error = -error - 180;
+  return error;
+}
 
 void loop()
 {
@@ -198,9 +212,11 @@ void loop()
   }
   switch(mode) {
     case MANUAL:
+      locator.rotate(targetHeading);
       if (millis() - lastMessageReceived > 500) chassis.stop();
     break;
     case AUTO:
+    locator.scan(targetHeading);
 //      if (chassis.isStopped()) {
 //        bool result = false;
 //        if (currentAngle > 0) {
@@ -209,7 +225,7 @@ void loop()
 //           if (!result) result = tryTurnRight();
 //           if (!result) rotate();
 //         } else if (currentAngle < 0) {
-//           result = tryTurnRight();
+//           result = tryTurnRight();0
 //           if (!result) result = tryMoveForward();
 //           if (!result) result = tryTurnLeft();
 //           if (!result) rotate();
@@ -222,19 +238,33 @@ void loop()
 //      } else if (chassis.isMovingForward()) {
 //        if (locator.scan(90) < SAFE_DISTANCE) chassis.stop();
 //      }
-    int heading = getHeading();
-    int error = abs(heading - targetHeading);
-    if (error > 5) {
-        if (heading > 0) {
-          chassis.setThrottle(constrain(error*2 ,100, 255));
-          chassis.turnLeft();
-        }
-        else {
-          chassis.setThrottle(constrain(error*2 ,100, 255));
-          chassis.turnRight();
-        }
-    } else {
-      chassis.stop();
+    if (millis() - lastCheck > 10){
+      lastCheck = millis();
+      int heading = getHeading();
+      int error = getError(heading, targetHeading);
+      
+      byte absoluteError = abs(error);
+      integralError += absoluteError;
+      int throttle = absoluteError * 2.5 + (integralError)*0.05 + (absoluteError - previousError)*7;
+      throttle = constrain(throttle, 0, 255);
+      previousError = absoluteError;
+      if (absoluteError > 10) {
+          if (error < 0) {
+            chassis.setThrottle(throttle);
+            chassis.turnLeft();
+          }
+          else {
+            chassis.setThrottle(throttle);
+            chassis.turnRight();
+          }
+      } else {
+        correctChecks++; 
+        previousError = 0;
+        integralError = 0;
+        correctChecks = 0;
+        
+        chassis.stop();
+      }
     }
     break;
   }

@@ -21,10 +21,11 @@ class Locator {
   byte echoPin, trigPin;
   int echo();
   void switchDirection();
-  void rotate(int);
+
   public:
   Locator();
   void tick();
+  void rotate(int);
   int scan(int angle);
   void setLocatorDataListener(void(*listener)(int, int));
   void attachServo(byte);

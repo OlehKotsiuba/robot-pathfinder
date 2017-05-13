@@ -135,7 +135,7 @@ Message getMessageFromController(unsigned int state) {
     }  
   } else if (abs(hX) > 25 || abs(hY) > 25) {
      msg.type = Message::SET_HEADING;
-     msg.payload.words.l = atan2(hX, hY) / 180 * PI;
+     msg.payload.words.l = atan2(hX, hY) / PI * 180;
   }
   else if (state & psxSqu) {
     msg.type = Message::SET_MODE;
