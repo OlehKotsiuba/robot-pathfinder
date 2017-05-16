@@ -11,11 +11,11 @@ void Chassis::stateChanged() {
 }
 
 void Chassis::reset() {
-  leftMotor.setThrottle(throttle);
-  rightMotor.setThrottle(throttle);
   leftEncoderCount = 0;
   rightEncoderCount = 0;
   targetPath = 0;
+  leftMotor.setThrottle(throttle);
+  rightMotor.setThrottle(throttle);
   startMoveTime = millis();
 }
 
@@ -30,14 +30,13 @@ void Chassis::attachRightMotor(byte throttlePin, byte forwardPin, byte reversePi
 }
 
 void Chassis::checkBalance() {
-  int p = 20;
   int error = leftEncoderCount - rightEncoderCount;
   if (error != 0) {
-    leftMotor.adjustThrottle(-error * p);
-    rightMotor.adjustThrottle(error * p);
+    balance = error * 20;
+    leftMotor.setThrottle(constrain(throttle - balance, 0, 255));
+    rightMotor.setThrottle(constrain(throttle + balance, 0, 255));
   } else {
-    leftMotor.adjustThrottle(0);
-    rightMotor.adjustThrottle(0);
+    balance = 0;
   }
 }
 
@@ -50,12 +49,11 @@ void Chassis::checkPath() {
 }
 
 void Chassis::forward() {
-  if (state != MOVING_FORWARD) {
-    stateChanged();
-    state = MOVING_FORWARD;
-    leftMotor.forward();
-    rightMotor.forward();
-  }
+  if (state == MOVING_FORWARD) return;
+  stateChanged();
+  state = MOVING_FORWARD;
+  leftMotor.forward();
+  rightMotor.forward();
 }
 
 void Chassis::forward(int distance) {
@@ -68,8 +66,8 @@ void Chassis::analog(int lThrottle, int rThrottle) {
     state = ANALOG;
     stateChanged();
   }
-  leftMotor.setThrottle(lThrottle);
-  rightMotor.setThrottle(rThrottle);
+  leftMotor.setThrottle(abs(lThrottle));
+  rightMotor.setThrottle(abs(rThrottle));
   if (lThrottle >= 0) leftMotor.forward();
   else leftMotor.reverse();
   if (rThrottle >= 0) rightMotor.forward();
@@ -77,12 +75,11 @@ void Chassis::analog(int lThrottle, int rThrottle) {
 }
 
 void Chassis::backward() {
-  if (state != MOVING_BACKWARD) {
-    stateChanged();
-    state = MOVING_BACKWARD;
-    leftMotor.reverse();
-    rightMotor.reverse();
-  }
+  if (state == MOVING_BACKWARD) return;
+  stateChanged();
+  state = MOVING_BACKWARD;  
+  leftMotor.reverse();
+  rightMotor.reverse();
 }
 
 void Chassis::backward(int distance) {
@@ -90,42 +87,25 @@ void Chassis::backward(int distance) {
   targetPath = distance * TICKS_IN_CM;
 }
 
-void Chassis::turnLeft() { 
-  if (state != TURNING_LEFT) {
-    stateChanged();
-    state = TURNING_LEFT;
-    leftMotor.reverse();
-    rightMotor.forward();
-  }  
+void Chassis::turnLeft() {
+  if (state == TURNING_LEFT) return;
+  stateChanged();
+  state = TURNING_LEFT;
+  leftMotor.reverse();
+  rightMotor.forward();
 }
 
-void Chassis::turnLeft(int angle) { 
-  turnLeft();
-  targetPath = angle * TICKS_IN_DEG;
-}
 
 void Chassis::turnRight() {
-  if (state != TURNING_RIGHT) {
-    stateChanged();
-    state = TURNING_RIGHT;
-    leftMotor.forward();
-    rightMotor.reverse();
-  }
-}
-
-void Chassis::turnRight(int angle) {
-  turnRight();
-  targetPath = angle * TICKS_IN_DEG;
-}
-
-void Chassis::turn(int angle) {
-  if (angle > 0) turnLeft(angle);
-  else turnRight(abs(angle));
+  if (state != TURNING_RIGHT) 
+  stateChanged();
+  state = TURNING_RIGHT;
+  leftMotor.forward();
+  rightMotor.reverse();
 }
 
 void Chassis::stop() {
   if (state != STOP) {
-  //brake();
   stateChanged();
   state = STOP;
   leftMotor.stop();
@@ -138,25 +118,6 @@ void Chassis::setThrottle(byte throttle) {
   leftMotor.setThrottle(throttle);
   rightMotor.setThrottle(throttle);
 }
-
-void Chassis::brake() {
-  long moveTime = millis() - startMoveTime;
-  if (state == TURNING_LEFT) {
-    leftMotor.forward();
-    rightMotor.reverse();
-  } else if (state == TURNING_RIGHT) {
-    leftMotor.reverse();
-    rightMotor.forward();
-  } else if (state == MOVING_FORWARD) {
-    leftMotor.reverse();
-    rightMotor.reverse();
-  } else if (state == MOVING_BACKWARD) {
-    leftMotor.forward();
-    rightMotor.forward();
-  }
-  delay(constrain(moveTime / 10, 0, 200));
-}
-
 
 void Chassis::setEncoderDataListener(void (*listener)(int, int)) {
   encoderListener = listener;
@@ -172,7 +133,7 @@ bool Chassis::isMovingForward() {
 
 void Chassis::tick() {
   if (state == ANALOG || state == STOP) return;
-  checkBalance();
+  //checkBalance();
   checkPath();
   return;
 }

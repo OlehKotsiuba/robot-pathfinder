@@ -8,7 +8,7 @@
 
 
 #define SCAN_DELAY 100
-#define SAFE_DISTANCE 20
+#define SAFE_DISTANCE 30
 #define SCAN_ANGLE 90
 #define SCAN_RESOLUTION 180 / SCAN_ANGLE
 
@@ -24,7 +24,8 @@ int currentAngle = 0;
 int previousError = 0;
 long integralError = 0;
 
-int targetHeading= 0;
+int targetHeading = 0;
+int heading = 0;
 
 struct Path {
   int angle;
@@ -37,9 +38,10 @@ enum Mode: byte {
 } mode = MANUAL;
 
 enum State: byte {
-  PATH_FINDING,
-  MOVING
-} state = PATH_FINDING;
+  SEARCHING_PATH,
+  MOVING,
+  TURNING
+} state = TURNING;
 
 long lastMessageReceived = 0;
 
@@ -66,9 +68,9 @@ void processMessage(Message *msg) {
   switch(msg->type) {
     case Message::SET_MODE:
       mode = msg->payload.dWord;
+      targetHeading = getHeading();
     case Message::SET_HEADING:
-      targetHeading = 180 - abs(msg->payload.words.l);
-      
+      heading = abs(msg->payload.words.l);
     break;
   }
 }
@@ -96,7 +98,7 @@ void processManualMoveMessage(Message *msg) {
 }
 
 void setup() {
-  //Serial.begin(115200);
+//  Serial.begin(115200);
   radio.begin();
   radio.setPayloadSize(sizeof(Message)); // Default payload size is 32 bytes. If we dont specify it, unused bytes of message will be filled with zeros
 
@@ -114,9 +116,12 @@ void setup() {
 
   Chassis::attachInterrupts(2,3);
 
-  locator.attachServo(10);
+//  locator.attachServo(10);
   locator.attachSonicSensor(A3, A2);
 //  locator->setLocatorDataListener(sendLocatorData);
+
+  targetHeading = getHeading();
+  heading = 0;
 }
 
 int getHeading() {
@@ -127,81 +132,27 @@ int getHeading() {
   return heading * 180/PI;
 }
 
-Path findBestPath() {
-  Path bestPath;
-  unsigned int bestScore;
-  for(byte i = 0; i <= 180 / SCAN_ANGLE ; i++) {
-    int angle = i * SCAN_ANGLE;
-    byte distance = locator.scan(angle);
-    if (distance > SAFE_DISTANCE) { 
-      int score = getPathScore(angle, distance);
-      if (score > bestScore ) {
-        bestPath.angle = angle;
-        bestPath.distance = distance;
-        bestScore = score;
-      }
-    }
-  }
-  return bestPath;
-}
-
-int getPathScore(int angle, int distance) {
-  int direction = currentAngle + angle - 90;
-    if (abs(direction) > 180) {
-      direction %= 180;
-      direction = direction > 0 ? 180 - direction : 180 + direction;
-    }
-  return (180 - abs(direction)) / 9 * distance;
-}
-
-bool tryMoveForward() {
-  int distance = locator.scan(90);
-  if (distance > SAFE_DISTANCE){
-    chassis.forward(distance - SAFE_DISTANCE);
-    return true;
-  }
-  return false;
-}
-
-bool tryTurnRight() {
-  int distance = locator.scan(180);
-   if (distance > SAFE_DISTANCE){
-    chassis.turn(90);
-    currentAngle += 90;
-    if (currentAngle > 180) currentAngle =- 360;
-    return true;
-  }
-  return false;
-}
-
-bool tryTurnLeft() {
-  int distance = locator.scan(0);
-   if (distance > SAFE_DISTANCE){
-    chassis.turn(-90);
-    currentAngle -= 90;
-    if (currentAngle < -180) currentAngle =+ 360;
-    return true;
-  }
-  return false;
-}
-
-bool rotate() {
-  chassis.turn(180);
-  currentAngle += 180;
-  if (currentAngle > 180) -180 + currentAngle % 180;
-}
 long lastCheck = 0;
 byte correctChecks = 0;
 
 int getError(int heading, int target) {
   int error = target - heading;
-  if (error > 180) error = -error + 180;
-  else if (error < -180) error = -error - 180;
+  if (error > 180) {
+    error -=360;
+  } else if (error < -180) {
+    error += 360;
+  }
   return error;
 }
 
-void loop()
-{
+int rotate(int direction, int angle) {
+  direction += angle;
+  if(direction > 360) direction -= 360;
+  else if (direction < 0) direction += 360;
+  return direction;
+}
+
+void loop() {
   Message inRadiomessage;
   if(radio.available()) { // If there is a received message in message buffer
     while(radio.available()) { 
@@ -212,62 +163,38 @@ void loop()
   }
   switch(mode) {
     case MANUAL:
-      locator.rotate(targetHeading);
       if (millis() - lastMessageReceived > 500) chassis.stop();
     break;
     case AUTO:
-    locator.scan(targetHeading);
-//      if (chassis.isStopped()) {
-//        bool result = false;
-//        if (currentAngle > 0) {
-//           result = tryTurnLeft();
-//           if (!result) result = tryMoveForward();
-//           if (!result) result = tryTurnRight();
-//           if (!result) rotate();
-//         } else if (currentAngle < 0) {
-//           result = tryTurnRight();0
-//           if (!result) result = tryMoveForward();
-//           if (!result) result = tryTurnLeft();
-//           if (!result) rotate();
-//         } else {
-//           result = tryMoveForward();
-//           if (!result) result = tryTurnRight();
-//           if (!result) result = tryTurnLeft();
-//           if (!result) rotate();
-//         }
-//      } else if (chassis.isMovingForward()) {
-//        if (locator.scan(90) < SAFE_DISTANCE) chassis.stop();
-//      }
-    if (millis() - lastCheck > 10){
-      lastCheck = millis();
-      int heading = getHeading();
-      int error = getError(heading, targetHeading);
-      
-      byte absoluteError = abs(error);
-      integralError += absoluteError;
-      int throttle = absoluteError * 2.5 + (integralError)*0.05 + (absoluteError - previousError)*7;
-      throttle = constrain(throttle, 0, 255);
-      previousError = absoluteError;
-      if (absoluteError > 10) {
-          if (error < 0) {
-            chassis.setThrottle(throttle);
-            chassis.turnLeft();
+        if (millis() - lastCheck > 10){
+          lastCheck = millis();
+          int currentHeading = getHeading();
+          int error = getError(currentHeading, heading);
+          byte absoluteError = abs(error);
+          integralError += absoluteError;
+          int throttle = absoluteError * 4 + (integralError)*0.05 + (absoluteError - previousError)*128;
+          previousError = absoluteError;
+          throttle = constrain(throttle, 0, 255);
+          chassis.setThrottle(throttle);
+          if (absoluteError > 10) {
+              if (error < 0) {
+                chassis.turnLeft();
+              }
+              else {
+                chassis.turnRight();
+              }
+          } else {
+            correctChecks++; 
+            previousError = 0;
+            integralError = 0;
+            chassis.stop();
+            if (correctChecks > 20) {
+              correctChecks = 0; 
+            }
           }
-          else {
-            chassis.setThrottle(throttle);
-            chassis.turnRight();
-          }
-      } else {
-        correctChecks++; 
-        previousError = 0;
-        integralError = 0;
-        correctChecks = 0;
-        
-        chassis.stop();
-      }
-    }
+        }
     break;
-  }
- chassis.tick();
+    }
+  chassis.tick();
 }
 

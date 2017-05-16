@@ -20,6 +20,7 @@ class Chassis {
   int lThrottle, rThrottle;
   unsigned long startMoveTime = 0;
   byte throttle = 200;
+  int balance = 0;
 
   void stateChanged();
   void reset();
@@ -37,8 +38,6 @@ class Chassis {
   void analog(int, int);
   void turnLeft();
   void turnRight();
-  void turnLeft(int);
-  void turnRight(int);
   void turn(int);
   void setThrottle(byte);
   void stop();

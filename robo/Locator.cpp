@@ -30,9 +30,9 @@ void Locator::switchDirection() {
 }
 
 int Locator::scan(int angle) {
-  if (position != angle) {
-    rotate(angle);
-  }
+//  if (position != angle) {
+//    rotate(angle);
+//  }
   return echo();
 }
 
@@ -59,7 +59,7 @@ void Locator::setLocatorDataListener(void(*listener)(int, int)) {
 
 void Locator::attachServo(byte pin) {
   servo.attach(pin);
-  servo.write((MAX_ANGLE - MIN_ANGLE) / 2 + MIN_ANGLE);
+//  servo.write((MAX_ANGLE - MIN_ANGLE) / 2 + MIN_ANGLE);
 }
 
 void Locator::attachSonicSensor(byte echoPin, byte trigPin) {
