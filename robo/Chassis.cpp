@@ -133,8 +133,7 @@ bool Chassis::isMovingForward() {
 
 void Chassis::tick() {
   if (state == ANALOG || state == STOP) return;
-  //checkBalance();
-  checkPath();
+  checkBalance();
   return;
 }
 

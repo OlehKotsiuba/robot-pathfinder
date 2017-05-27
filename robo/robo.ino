@@ -5,6 +5,7 @@
 #include "Message.h"
 #include "Chassis.h"
 #include "Locator.h"
+#include <Servo.h>
 
 
 #define SCAN_DELAY 100
@@ -14,6 +15,8 @@
 
 RF24 radio(7,8);
 HMC5883L mag;
+
+Servo servo;
 
 byte addresses[][6] = {"1Node","2Node"};
 
@@ -38,12 +41,13 @@ enum Mode: byte {
 } mode = MANUAL;
 
 enum State: byte {
-  SEARCHING_PATH,
+  SCANNING,
   MOVING,
   TURNING
 } state = TURNING;
 
 long lastMessageReceived = 0;
+long lastScanTime = 0;
 
 void sendEncoderData(long leftCount, long rightCount) {
   sendMessage(Message::ENCODER_DATA, leftCount, rightCount);
@@ -116,12 +120,13 @@ void setup() {
 
   Chassis::attachInterrupts(2,3);
 
-//  locator.attachServo(10);
-  locator.attachSonicSensor(A3, A2);
+  //locator.attachServo(10);
+  locator.attach(A3, A2);
 //  locator->setLocatorDataListener(sendLocatorData);
 
   targetHeading = getHeading();
   heading = 0;
+  servo.attach(10, 700, 2310);
 }
 
 int getHeading() {
@@ -161,40 +166,100 @@ void loop() {
     processMessage(&inRadiomessage);
     lastMessageReceived = millis();
   }
+  
   switch(mode) {
     case MANUAL:
       if (millis() - lastMessageReceived > 500) chassis.stop();
+      chassis.tick();
     break;
     case AUTO:
-        if (millis() - lastCheck > 10){
-          lastCheck = millis();
-          int currentHeading = getHeading();
-          int error = getError(currentHeading, heading);
-          byte absoluteError = abs(error);
-          integralError += absoluteError;
-          int throttle = absoluteError * 4 + (integralError)*0.05 + (absoluteError - previousError)*128;
-          previousError = absoluteError;
-          throttle = constrain(throttle, 0, 255);
-          chassis.setThrottle(throttle);
-          if (absoluteError > 10) {
-              if (error < 0) {
-                chassis.turnLeft();
+      switch(state) {
+
+        case TURNING: {
+          if (millis() - lastCheck > 10){
+            lastCheck = millis();
+            int currentHeading = getHeading();
+            int error = getError(currentHeading, heading);
+            byte absoluteError = abs(error);
+            integralError += absoluteError;
+            int throttle = absoluteError * 4 + (integralError)*0.05 + (absoluteError - previousError)*128;
+            previousError = absoluteError;
+            throttle = constrain(throttle, 0, 255);
+            chassis.setThrottle(throttle);
+            if (absoluteError > 2) {
+                if (error < 0) {
+                  chassis.turnLeft();
+                }
+                else {
+                  chassis.turnRight();
+                }
+            } else {
+              correctChecks++; 
+              previousError = 0;
+              integralError = 0;
+              chassis.stop();
+              if (correctChecks > 100) {
+                correctChecks = 0;
+                //state = SCANNING;
               }
-              else {
-                chassis.turnRight();
-              }
-          } else {
-            correctChecks++; 
-            previousError = 0;
-            integralError = 0;
-            chassis.stop();
-            if (correctChecks > 20) {
-              correctChecks = 0; 
             }
           }
+          break;
         }
-    break;
-    }
-  chassis.tick();
+
+        case SCANNING: {
+          byte scanAngle = 0;
+          byte distances = 0xFF;
+          
+          int servoPos = servo.read();
+          int scanStartTime = 0;
+          servo.write(0);
+          delay(abs(servoPos - 10) * 4);
+          for (byte i = 0; i < 5; i++) {
+              scanStartTime = millis();
+              servo.write(i * 45);
+              delay(200);
+              if (locator.echo() < SAFE_DISTANCE) {
+                  distances &= ~(1 << i);
+               }
+          }
+          if ((distances & 0b00001110) == 0b00001110) {
+            state = MOVING;
+          } else if ((distances & 0b00000111) == 0b00000111) {
+            heading = rotate(heading, 45);
+            state = TURNING;
+          } else if ((distances & 0b0011100) == 0b0011100) {
+            heading = rotate(heading, -45);
+            state = TURNING;
+          } else {
+            heading = rotate(heading, 90);
+            state = TURNING;
+          }
+          break;
+        }
+
+        case MOVING: {
+          if (servo.read() != 90) {
+            servo.write(90);
+            delay(500);
+          }
+          servo.write(90);
+          chassis.forward();
+          if (millis() - lastScanTime > 200) {
+            lastScanTime = millis();
+            if (locator.echo() < SAFE_DISTANCE) {
+                 /* Obstacle is located. Stop moving and start scanning for new path */
+                 chassis.stop();
+                 state = SCANNING; 
+                 break;
+            }
+          }
+          break;
+        }
+    }   
+    chassis.tick();
+  }
+  
 }
+
 

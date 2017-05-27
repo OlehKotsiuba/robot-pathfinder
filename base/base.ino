@@ -33,6 +33,17 @@ void setup() {
 }
 
 void loop() {
+    
+  if(Serial.available()) {
+    char serialInMsg[20];
+    byte length = Serial.readBytesUntil('\n', serialInMsg, sizeof(serialInMsg));
+    serialInMsg[length] = '\0';
+    Message outRadioMessage = getMessageFromSerial(serialInMsg);
+    radio.stopListening();
+    radio.write( &outRadioMessage, sizeof(Message));
+    radio.startListening();
+    return;
+  }
 
    if(radio.available()) {
       Message inRadioMessage;   
@@ -53,16 +64,7 @@ void loop() {
       }
    }
 
-  if(Serial.available()) {
-    char serialInMsg[20];
-    byte length = Serial.readBytesUntil('\n', serialInMsg, sizeof(serialInMsg));
-    serialInMsg[length] = '\0';
-    Message outRadioMessage = getMessageFromSerial(serialInMsg);
-    radio.stopListening();
-    radio.write( &outRadioMessage, sizeof(Message));
-    radio.startListening();
-    return;
-  }
+
 
   unsigned int buttonState = Psx.read();
 
